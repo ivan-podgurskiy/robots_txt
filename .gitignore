@@ -1,0 +1,14 @@
+/_build/
+/cover/
+/deps/
+/doc/
+
+erl_crash.dump
+*.ez
+robots_txt-*.tar
+
+/tmp/
+/priv/plts/*.plt
+/priv/plts/*.plt.hash
+
+.DS_Store
