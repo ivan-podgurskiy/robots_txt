@@ -128,6 +128,90 @@ defmodule RobotsTxt do
   end
 
   @doc """
+  Returns all sitemap values in file order.
+
+  Sitemap directives are independent of user-agent groups. Values are returned
+  exactly as parsed after comment removal and surrounding whitespace trimming.
+
+  ## Example
+
+      iex> robots = RobotsTxt.parse("Sitemap: https://example.com/sitemap.xml")
+      iex> RobotsTxt.sitemaps(robots)
+      ["https://example.com/sitemap.xml"]
+  """
+  @spec sitemaps(t()) :: [binary()]
+  def sitemaps(%__MODULE__{sitemaps: sitemaps}), do: sitemaps
+
+  @doc """
+  Returns the first parseable non-negative crawl delay for `user_agent`.
+
+  Crawl delay is not part of RFC 9309 and is never enforced by this library.
+  Matching specific groups take precedence over global groups, and repeated
+  matching groups are inspected in file order. Returns `nil` when no selected
+  group contains a complete non-negative integer or float value.
+
+  ## Examples
+
+      iex> robots = RobotsTxt.parse("User-agent: *\\nCrawl-delay: 1.5")
+      iex> RobotsTxt.crawl_delay(robots, "ExampleBot")
+      1.5
+
+      iex> RobotsTxt.crawl_delay(RobotsTxt.parse(""), "ExampleBot")
+      nil
+  """
+  @spec crawl_delay(t(), binary()) :: number() | nil
+  def crawl_delay(%__MODULE__{} = robots, user_agent) when is_binary(user_agent) do
+    robots
+    |> RobotsTxt.Matcher.selected_groups(user_agent)
+    |> Enum.find_value(fn group -> Enum.find_value(group.crawl_delays, &parse_delay/1) end)
+  end
+
+  @doc """
+  Returns unknown directives associated with a selected group or global scope.
+
+  Directive names are lowercased. Values are raw apart from comment removal and
+  surrounding whitespace trimming, and remain in file order. Passing a crawler
+  token uses the same specific-over-global group selection as `allowed?/3`;
+  passing `:global` returns directives found outside every group.
+
+  ## Examples
+
+      iex> robots = RobotsTxt.parse("Content-Signal: ai-train=no")
+      iex> RobotsTxt.extensions(robots, :global)
+      %{"content-signal" => ["ai-train=no"]}
+
+      iex> robots = RobotsTxt.parse("User-agent: *\\nX-Policy: one")
+      iex> RobotsTxt.extensions(robots, "ExampleBot")
+      %{"x-policy" => ["one"]}
+  """
+  @spec extensions(t(), binary() | :global) :: %{optional(binary()) => [binary()]}
+  def extensions(%__MODULE__{global_extensions: extensions}, :global), do: extensions
+
+  def extensions(%__MODULE__{} = robots, user_agent) when is_binary(user_agent) do
+    robots
+    |> RobotsTxt.Matcher.selected_groups(user_agent)
+    |> Enum.reduce(%{}, fn group, merged -> merge_extensions(merged, group.extensions) end)
+  end
+
+  defp merge_extensions(merged, extensions) do
+    Map.merge(merged, extensions, fn _key, earlier, later -> earlier ++ later end)
+  end
+
+  defp parse_delay(value) do
+    case Integer.parse(value) do
+      {delay, ""} when delay >= 0 -> delay
+      _result -> parse_float_delay(value)
+    end
+  end
+
+  defp parse_float_delay(value) do
+    case Float.parse(value) do
+      {delay, ""} when delay >= 0 -> delay
+      _result -> nil
+    end
+  end
+
+  @doc """
   Classifies a final HTTP response according to RFC 9309 fetch semantics.
 
   The result tells an integration whether to parse the response body, allow all

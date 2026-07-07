@@ -124,4 +124,83 @@ defmodule RobotsTxt.MatcherTest do
     assert RobotsTxt.matched_rule(robots, "Bar", "/") == :default
     assert RobotsTxt.allowed?(robots, "Bar", "/")
   end
+
+  test "sitemaps are returned in file order independently of groups" do
+    robots =
+      RobotsTxt.parse("""
+      Sitemap: https://example.com/one.xml
+      User-agent: Foo
+      Site-map: https://example.com/two.xml
+      """)
+
+    assert RobotsTxt.sitemaps(robots) == [
+             "https://example.com/one.xml",
+             "https://example.com/two.xml"
+           ]
+  end
+
+  test "extensions merge selected specific groups in file order" do
+    robots =
+      RobotsTxt.parse("""
+      User-agent: Foo
+      X-Policy: one
+      Content-Signal: search=yes
+      Disallow:
+      User-agent: Foo
+      X-Policy: two
+      Disallow:
+      User-agent: *
+      X-Policy: global
+      """)
+
+    assert RobotsTxt.extensions(robots, "Foo") == %{
+             "content-signal" => ["search=yes"],
+             "x-policy" => ["one", "two"]
+           }
+
+    assert RobotsTxt.extensions(robots, "Other") == %{"x-policy" => ["global"]}
+  end
+
+  test "global extensions are returned separately" do
+    robots =
+      RobotsTxt.parse("""
+      Content-Signal: ai-train=no
+      X-Policy: first
+      X-Policy: second
+      User-agent: *
+      Disallow:
+      """)
+
+    assert RobotsTxt.extensions(robots, :global) == %{
+             "content-signal" => ["ai-train=no"],
+             "x-policy" => ["first", "second"]
+           }
+  end
+
+  test "crawl_delay returns the first parseable non-negative value in selected groups" do
+    robots =
+      RobotsTxt.parse("""
+      User-agent: Foo
+      Crawl-delay: invalid
+      Crawl-delay: -1
+      Disallow:
+      User-agent: Foo
+      Crawl-delay: 1.5
+      Crawl-delay: 3
+      Disallow:
+      User-agent: *
+      Crawl-delay: 9
+      """)
+
+    assert RobotsTxt.crawl_delay(robots, "Foo") == 1.5
+    assert RobotsTxt.crawl_delay(robots, "Other") == 9
+  end
+
+  test "crawl_delay returns nil for absent or wholly invalid values" do
+    absent = RobotsTxt.parse("User-agent: Foo\nDisallow: /")
+    invalid = RobotsTxt.parse("User-agent: Foo\nCrawl-delay: 2 seconds")
+
+    assert RobotsTxt.crawl_delay(absent, "Foo") == nil
+    assert RobotsTxt.crawl_delay(invalid, "Foo") == nil
+  end
 end
