@@ -17,6 +17,9 @@ defmodule RobotsTxt.Parser do
   alias RobotsTxt.Rule
 
   @max_line_bytes 16_663
+  @user_agent_prefixes ["user-agent", "useragent", "user agent"]
+  @disallow_prefixes ["disallow", "dissallow", "dissalow", "disalow", "diasllow", "disallaw"]
+  @sitemap_prefixes ["sitemap", "site-map"]
 
   @doc """
   Parses a robots.txt body into a `RobotsTxt` struct.
@@ -156,24 +159,24 @@ defmodule RobotsTxt.Parser do
   defp classify_directive(:ignore), do: :ignore
 
   defp classify_directive({key, value}) do
-    cond do
-      prefix?(key, "user-agent") or prefix?(key, "useragent") or prefix?(key, "user agent") ->
-        {:user_agent, value}
-
-      prefix?(key, "allow") ->
-        {:allow, value}
-
-      prefix?(key, "disallow") or prefix?(key, "dissallow") or
-        prefix?(key, "dissalow") or prefix?(key, "disalow") or
-        prefix?(key, "diasllow") or prefix?(key, "disallaw") ->
-        {:disallow, value}
-
-      prefix?(key, "sitemap") or prefix?(key, "site-map") ->
-        {:sitemap, value}
-
-      true ->
-        {:unknown, key, value}
+    case directive_type(key) do
+      :unknown -> {:unknown, key, value}
+      type -> {type, value}
     end
+  end
+
+  defp directive_type(key) do
+    cond do
+      prefixed_by_any?(key, @user_agent_prefixes) -> :user_agent
+      prefix?(key, "allow") -> :allow
+      prefixed_by_any?(key, @disallow_prefixes) -> :disallow
+      prefixed_by_any?(key, @sitemap_prefixes) -> :sitemap
+      true -> :unknown
+    end
+  end
+
+  defp prefixed_by_any?(value, prefixes) do
+    Enum.any?(prefixes, &prefix?(value, &1))
   end
 
   defp prefix?(value, prefix) when byte_size(value) >= byte_size(prefix) do
