@@ -1,0 +1,10 @@
+This project includes an Elixir adaptation of test cases from Google's
+robotstxt project:
+
+  https://github.com/google/robotstxt
+  robots_test.cc
+  revision 22b355ff855419e6a3ff8ff09c0ad7fdb17116f9
+
+Copyright 2019 Google LLC. The adapted test file is provided under the Apache
+License, Version 2.0. The robots_txt library implementation remains licensed
+under the MIT License in LICENSE.
