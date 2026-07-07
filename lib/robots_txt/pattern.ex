@@ -1,8 +1,32 @@
 defmodule RobotsTxt.Pattern do
-  @moduledoc false
+  @moduledoc """
+  Byte-oriented robots.txt pattern normalization and matching.
+
+  Matching follows Google's position-set algorithm. It supports `*` as a
+  wildcard and treats `$` as an end anchor only when it is the final pattern
+  byte. It does not decode or normalize the target path.
+
+  This module is an implementation detail. Callers should use the matching
+  functions exposed by `RobotsTxt` rather than depend on it directly.
+  """
 
   import Bitwise
 
+  @doc """
+  Canonicalizes a rule pattern for matching.
+
+  Existing `%XX` sequences are preserved with uppercase hex digits. Bytes at
+  or above `0x80` are percent-encoded, while all other bytes are copied as-is.
+  The operation is idempotent and never decodes input.
+
+  ## Examples
+
+      iex> RobotsTxt.Pattern.escape("/a%2f")
+      "/a%2F"
+
+      iex> RobotsTxt.Pattern.escape(<<"/caf", 0xC3, 0xA9>>)
+      "/caf%C3%A9"
+  """
   @spec escape(binary()) :: binary()
   def escape(value) when is_binary(value) do
     value
@@ -11,6 +35,23 @@ defmodule RobotsTxt.Pattern do
     |> IO.iodata_to_binary()
   end
 
+  @doc """
+  Returns whether an escaped path matches a canonical rule pattern.
+
+  Patterns are anchored at the start. Reaching the end of a pattern is a match
+  even when bytes remain in the path, unless the pattern ends with `$`.
+
+  ## Examples
+
+      iex> RobotsTxt.Pattern.match?("/private/page", "/private/")
+      true
+
+      iex> RobotsTxt.Pattern.match?("/private/page", "/private/$")
+      false
+
+      iex> RobotsTxt.Pattern.match?("/a/x/b", "/a/*/b$")
+      true
+  """
   @spec match?(binary(), binary()) :: boolean()
   def match?(path, pattern) when is_binary(path) and is_binary(pattern) do
     match_pattern(path, pattern, [0], byte_size(path))

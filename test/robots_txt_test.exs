@@ -1,6 +1,8 @@
 defmodule RobotsTxtTest do
   use ExUnit.Case, async: true
   doctest RobotsTxt
+  doctest RobotsTxt.Parser
+  doctest RobotsTxt.Pattern
 
   test "fetch_semantics/1 maps final response classes" do
     assert RobotsTxt.fetch_semantics(200) == :parse_body
