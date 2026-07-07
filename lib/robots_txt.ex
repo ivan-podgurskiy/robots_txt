@@ -79,6 +79,55 @@ defmodule RobotsTxt do
   end
 
   @doc """
+  Returns the rule that decides whether `user_agent` may fetch `target`.
+
+  `target` may be an escaped path or an absolute URL. Only its path, parameters,
+  and query participate in matching; scheme, host, port, and fragment are
+  ignored. The caller must provide an RFC 3986-escaped target.
+
+  Returns `:default` when no positive-priority rule decides the request. Default
+  access is allowed.
+
+  ## Examples
+
+      iex> robots = RobotsTxt.parse("User-agent: *\\nDisallow: /private")
+      iex> RobotsTxt.matched_rule(robots, "ExampleBot", "/private/page")
+      {:disallow, "/private", 2}
+      iex> RobotsTxt.matched_rule(robots, "ExampleBot", "/public")
+      :default
+  """
+  @spec matched_rule(t(), binary(), binary()) ::
+          {:allow | :disallow, binary(), pos_integer()} | :default
+  def matched_rule(%__MODULE__{} = robots, user_agent, target)
+      when is_binary(user_agent) and is_binary(target) do
+    RobotsTxt.Matcher.matched_rule(robots, user_agent, target)
+  end
+
+  @doc """
+  Returns whether `user_agent` may fetch `target`.
+
+  This is a boolean wrapper around `matched_rule/3`. A matching disallow rule
+  returns `false`; an allow rule or `:default` returns `true`.
+
+  ## Examples
+
+      iex> robots = RobotsTxt.parse("User-agent: *\\nDisallow: /private")
+      iex> RobotsTxt.allowed?(robots, "ExampleBot", "/private/page")
+      false
+      iex> RobotsTxt.allowed?(robots, "ExampleBot", "https://example.com/public")
+      true
+  """
+  @spec allowed?(t(), binary(), binary()) :: boolean()
+  def allowed?(%__MODULE__{} = robots, user_agent, target)
+      when is_binary(user_agent) and is_binary(target) do
+    case matched_rule(robots, user_agent, target) do
+      {:disallow, _pattern, _line} -> false
+      {:allow, _pattern, _line} -> true
+      :default -> true
+    end
+  end
+
+  @doc """
   Classifies a final HTTP response according to RFC 9309 fetch semantics.
 
   The result tells an integration whether to parse the response body, allow all
