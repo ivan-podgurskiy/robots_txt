@@ -49,6 +49,14 @@ defmodule RobotsTxt.MatcherTest do
     assert RobotsTxt.matched_rule(tied, "OtherBot", "/same") == {:allow, "/same", 3}
   end
 
+  test "equal escaped-length matches favor allow even with different source encodings" do
+    robots =
+      RobotsTxt.parse(<<"User-agent: *\nDisallow: /", 0xC3, 0xA9, "\nAllow: /%C3%A9">>)
+
+    assert RobotsTxt.matched_rule(robots, "Bot", "/%C3%A9") == {:allow, "/%C3%A9", 3}
+    assert RobotsTxt.allowed?(robots, "Bot", "/%C3%A9")
+  end
+
   test "specific groups suppress global groups even when no specific rule matches" do
     robots =
       RobotsTxt.parse("""
@@ -62,6 +70,22 @@ defmodule RobotsTxt.MatcherTest do
     assert RobotsTxt.allowed?(robots, "FooBot", "/public")
     refute RobotsTxt.allowed?(robots, "FooBot", "/private/page")
     refute RobotsTxt.allowed?(robots, "OtherBot", "/public")
+  end
+
+  test "one multi-agent AI crawler group applies to every listed crawler" do
+    robots =
+      RobotsTxt.parse("""
+      User-agent: GPTBot
+      User-agent: ClaudeBot
+      User-agent: anthropic-ai
+      Disallow: /
+      """)
+
+    for crawler <- ["GPTBot", "ClaudeBot", "anthropic-ai"] do
+      refute RobotsTxt.allowed?(robots, crawler, "/anything")
+    end
+
+    assert RobotsTxt.allowed?(robots, "OtherBot", "/anything")
   end
 
   test "file-side user agents are extracted while crawler tokens are not" do
@@ -117,6 +141,37 @@ defmodule RobotsTxt.MatcherTest do
 
     refute RobotsTxt.allowed?(robots, "Bot", "https://example.com/search?q=secret#part")
     assert RobotsTxt.allowed?(robots, "Bot", "https://example.com/search?q=public")
+  end
+
+  test "escaped slash bytes are distinct from path separators" do
+    robots =
+      RobotsTxt.parse("""
+      User-agent: *
+      Disallow: /a/b
+      Allow: /a%2Fb
+      """)
+
+    refute RobotsTxt.allowed?(robots, "Bot", "/a/b")
+    assert RobotsTxt.allowed?(robots, "Bot", "/a%2Fb")
+  end
+
+  test "dollar is literal when it appears before the end of a pattern" do
+    robots = RobotsTxt.parse("User-agent: *\nDisallow: /cash$money")
+
+    refute RobotsTxt.allowed?(robots, "Bot", "/cash$money")
+    assert RobotsTxt.allowed?(robots, "Bot", "/cash")
+  end
+
+  test "disallow index files do not retry against the containing directory" do
+    robots =
+      RobotsTxt.parse("""
+      User-agent: *
+      Allow: /
+      Disallow: /blocked/index.html
+      """)
+
+    assert RobotsTxt.allowed?(robots, "Bot", "/blocked/")
+    refute RobotsTxt.allowed?(robots, "Bot", "/blocked/index.html")
   end
 
   test "no matching group or rule defaults to allowed" do

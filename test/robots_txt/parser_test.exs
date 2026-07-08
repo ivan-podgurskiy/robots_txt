@@ -82,6 +82,30 @@ defmodule RobotsTxt.ParserTest do
     assert parsed.sitemaps == ["https://x/s.xml"]
   end
 
+  test "unsupported disallow typos remain extension directives" do
+    parsed =
+      RobotsTxt.parse("""
+      User-agent: A
+      Dissallaw: /one
+      Diasallow: /two
+      Disalaw: /three
+      Disallow: /supported
+      """)
+
+    assert [
+             %Group{
+               rules: [%{action: :disallow, pattern: "/supported"}],
+               extensions: extensions
+             }
+           ] = parsed.groups
+
+    assert extensions == %{
+             "diasallow" => ["/two"],
+             "disalaw" => ["/three"],
+             "dissallaw" => ["/one"]
+           }
+  end
+
   test "missing colon is accepted only for exactly two tokens" do
     parsed = RobotsTxt.parse("user-agent A\ndisallow /x\nfoo bar baz")
 
