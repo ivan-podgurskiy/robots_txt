@@ -9,7 +9,13 @@ defmodule RobotsTxt do
   The library is deliberately limited to parsing and matching. It does not
   fetch robots.txt files, follow redirects, cache responses, enforce crawl
   delays, or schedule crawler work. Those responsibilities remain with the
-  caller.
+  caller. The caller must also scope each parsed file to the origin from which
+  it was fetched.
+
+  Matching uses a caller-supplied crawler product token, not a complete HTTP
+  `User-Agent` header. File-side `User-agent` values are reduced to their
+  leading ASCII product token before a case-insensitive comparison; the
+  caller-supplied token is compared as-is.
 
   ## Parsing
 
@@ -83,10 +89,12 @@ defmodule RobotsTxt do
 
   `target` may be an escaped path or an absolute URL. Only its path, parameters,
   and query participate in matching; scheme, host, port, and fragment are
-  ignored. The caller must provide an RFC 3986-escaped target.
+  ignored. The caller must provide an RFC 3986-escaped target and ensure that
+  the parsed file belongs to the target's origin.
 
   Returns `:default` when no positive-priority rule decides the request. Default
-  access is allowed.
+  access is allowed. A returned tuple contains the action, the original
+  file-side pattern, and its one-based source line number.
 
   ## Examples
 

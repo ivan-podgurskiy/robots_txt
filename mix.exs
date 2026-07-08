@@ -40,7 +40,8 @@ defmodule RobotsTxt.MixProject do
     [
       files: ~w(lib .formatter.exs mix.exs README.md LICENSE CHANGELOG.md),
       licenses: ["MIT"],
-      links: %{"GitHub" => @source_url}
+      links: %{"GitHub" => @source_url},
+      maintainers: ["Ivan Podgurskiy"]
     ]
   end
 
@@ -49,7 +50,7 @@ defmodule RobotsTxt.MixProject do
       main: "RobotsTxt",
       source_ref: "v#{@version}",
       source_url: @source_url,
-      extras: ["README.md", "CHANGELOG.md"]
+      extras: ["README.md", "CHANGELOG.md", "LICENSE"]
     ]
   end
 end
